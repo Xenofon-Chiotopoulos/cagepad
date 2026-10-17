@@ -1,0 +1,104 @@
+name: Update puzzles & deploy
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 * * * *"          # hourly: pick up new logic-masters puzzles
+  workflow_dispatch:
+    inputs:
+      ids:
+        description: "logic-masters puzzle IDs to (re)fetch, e.g. 000VJX 000VJY (leave empty to scan the newest list)"
+        required: false
+        default: ""
+      pages:
+        description: "Listing pages to scan (20 puzzles per page)"
+        required: false
+        default: "3"
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+  issues: write
+
+concurrency:
+  group: site
+  cancel-in-progress: false
+
+jobs:
+  scrape:
+    # Pushes only redeploy. Issue requests are honoured only from the repository owner.
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'issues' && github.event.issue.user.login == github.repository_owner &&
+       startsWith(github.event.issue.title, 'fetch'))
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Scrape logic-masters
+        env:
+          IDS: ${{ github.event.inputs.ids || github.event.issue.title || '' }}
+          PAGES: ${{ github.event.inputs.pages || '3' }}
+        run: |
+          python scraper/scrape.py --ids "$IDS" --pages "$PAGES"
+      - name: Commit data
+        run: |
+          git config user.name "cagepad-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Update puzzle cache"
+            git push
+          fi
+      - name: Reply to request
+        if: github.event_name == 'issues'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          ISSUE: ${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          report=$(python - <<'EOF'
+          import json, os, re
+          lines = []
+          for pid in re.findall(r"\b(?=[0-9A-Z]*\d)[0-9A-Z]{6}\b", os.environ["TITLE"].upper()):
+              try:
+                  rec = json.load(open(f"data/puzzles/{pid}.json"))
+              except OSError:
+                  lines.append(f"- {pid}: not found on logic-masters")
+                  continue
+              ok = "cached ✓" if rec.get("data") else "no playable data yet (%s)" % (rec.get("error") or "no SudokuPad/f-puzzles link")
+              lines.append(f"- {pid} {rec.get('title') or ''}: {ok}")
+          print("\n".join(lines) or "No logic-masters IDs found in the title.")
+          EOF
+          )
+          gh issue close "$ISSUE" --repo "$GITHUB_REPOSITORY" --comment "$report
+
+          The site redeploys in about a minute."
+
+  deploy:
+    needs: scrape
+    if: >-
+      always() && (needs.scrape.result == 'success' ||
+      (needs.scrape.result == 'skipped' && github.event_name == 'push'))
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: deployment
+        uses: actions/deploy-pages@v4

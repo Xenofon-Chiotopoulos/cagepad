@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CagePad</title>
+<meta name="description" content="Solve logic-masters.de sudokus with SudokuPad-style controls, live cage totals, killer combinations and more.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='2' y='2' width='28' height='28' rx='6' fill='%231f5fd1'/%3E%3Crect x='7' y='7' width='18' height='18' fill='none' stroke='white' stroke-width='2' stroke-dasharray='3 2'/%3E%3Ctext x='16' y='21' font-family='sans-serif' font-size='12' font-weight='700' fill='white' text-anchor='middle'%3E%CE%A3%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/app.css">
+<script>
+	window.CAGEPAD_CONFIG = {repo: 'Xenofon-Chiotopoulos/cagepad'};
+	try {
+		const t = JSON.parse(localStorage.getItem('cagepad:settings') || '{}').theme;
+		if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+	} catch (e) {}
+</script>
+</head>
+<body>
+<header class="topbar">
+	<a class="brand" href="./" title="CagePad home">
+		<svg viewBox="0 0 32 32" aria-hidden="true"><rect x="2" y="2" width="28" height="28" rx="6" class="brand-bg"/><rect x="7" y="7" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-dasharray="3 2" class="brand-fg"/><text x="16" y="21" font-size="12" font-weight="700" text-anchor="middle" class="brand-t">Σ</text></svg>
+		<span>CagePad</span>
+	</a>
+	<form id="loadForm" class="load-form" autocomplete="off">
+		<input id="loadInput" type="text" spellcheck="false" placeholder="logic-masters link, puzzle ID (000VJX), SudokuPad or f-puzzles link…" aria-label="Puzzle link or ID">
+		<button type="submit" class="btn btn-primary">Load</button>
+	</form>
+	<nav class="top-actions">
+		<button class="btn" id="browseBtn" title="Browse the newest logic-masters puzzles (B)">Browse</button>
+		<button class="icon-btn" id="settingsBtn" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1Z"/></svg></button>
+		<button class="icon-btn" id="helpBtn" title="Help &amp; keyboard shortcuts (?)" aria-label="Help"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.3 9.2a2.8 2.8 0 0 1 5.4 1c0 1.9-2.7 2.5-2.7 4"/><circle cx="12" cy="17.6" r=".6" class="fill"/></svg></button>
+	</nav>
+</header>
+
+<main class="layout" id="layout">
+	<section class="board-col">
+		<div class="puzzle-head">
+			<div class="ph-text">
+				<h1 id="pTitle">CagePad</h1>
+				<div class="ph-sub" id="pSub"></div>
+			</div>
+			<div class="timer-box">
+				<span class="timer" id="timer" title="Time spent">0:00</span>
+				<button class="icon-btn small" id="pauseBtn" title="Pause (P)" aria-label="Pause"><svg viewBox="0 0 24 24"><path d="M8 5v14M16 5v14"/></svg></button>
+			</div>
+		</div>
+		<div class="board-wrap" id="boardWrap">
+			<svg id="board" xmlns="http://www.w3.org/2000/svg" role="application" aria-label="Puzzle grid">
+				<g id="lUnder"></g><g id="lColors"></g><g id="lHigh"></g><g id="lGrid"></g><g id="lCages"></g>
+				<g id="lLines"></g><g id="lOver"></g><g id="lFocus"></g><g id="lDigits"></g><g id="lBadges"></g><g id="lSel"></g>
+			</svg>
+			<div class="board-msg" id="boardMsg" hidden></div>
+			<div class="paused" id="pausedCover" hidden><button class="btn btn-primary" id="resumeBtn">Resume</button></div>
+		</div>
+		<div class="sel-bar" id="selBar" aria-live="polite"></div>
+	</section>
+
+	<section class="side-col">
+		<div class="modes" role="radiogroup" aria-label="Entry mode">
+			<button class="mode" data-mode="normal" title="Normal (Z)">Normal</button>
+			<button class="mode" data-mode="corner" title="Corner marks (X / hold Shift)">Corner</button>
+			<button class="mode" data-mode="centre" title="Centre marks (C / hold Ctrl)">Centre</button>
+			<button class="mode" data-mode="colour" title="Colour (V / Ctrl+Shift)">Colour</button>
+		</div>
+		<div class="pad-row">
+			<div class="pad" id="pad"></div>
+			<div class="pad-actions">
+				<button class="btn" id="delBtn" title="Delete (Backspace)">Delete</button>
+				<button class="btn" id="undoBtn" title="Undo (Ctrl+Z)">Undo</button>
+				<button class="btn" id="redoBtn" title="Redo (Ctrl+Y)">Redo</button>
+				<button class="btn" id="checkBtn" title="Check the grid">Check</button>
+			</div>
+		</div>
+
+		<div class="tabs" role="tablist">
+			<button class="tab" role="tab" data-tab="sums">Sums</button>
+			<button class="tab" role="tab" data-tab="rules">Rules</button>
+			<button class="tab" role="tab" data-tab="tools">Tools</button>
+		</div>
+		<div class="panel" id="panel-sums" role="tabpanel"></div>
+		<div class="panel" id="panel-rules" role="tabpanel" hidden></div>
+		<div class="panel" id="panel-tools" role="tabpanel" hidden></div>
+	</section>
+</main>
+
+<dialog id="browseDlg" class="dlg dlg-wide">
+	<div class="dlg-head"><h2>Newest on logic-masters.de</h2><button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+	<div class="browse-tools">
+		<input id="browseSearch" type="search" placeholder="Filter by title, author or tag…" aria-label="Filter puzzles">
+		<label class="chk"><input type="checkbox" id="browsePlayable" checked> Playable here</label>
+		<label class="chk"><input type="checkbox" id="browseCages"> Has cages</label>
+		<label class="chk"><input type="checkbox" id="browseHideSolved"> Hide solved</label>
+	</div>
+	<div class="browse-meta" id="browseMeta"></div>
+	<div class="browse-list" id="browseList"></div>
+</dialog>
+
+<dialog id="settingsDlg" class="dlg">
+	<div class="dlg-head"><h2>Settings</h2><button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+	<div class="settings" id="settingsBody"></div>
+</dialog>
+
+<dialog id="helpDlg" class="dlg dlg-wide">
+	<div class="dlg-head"><h2>How CagePad works</h2><button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+	<div class="help" id="helpBody"></div>
+</dialog>
+
+<dialog id="solvedDlg" class="dlg">
+	<div class="dlg-head"><h2 id="solvedTitle">Solved!</h2><button class="icon-btn" data-close aria-label="Close"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6 6 18"/></svg></button></div>
+	<div id="solvedBody"></div>
+</dialog>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script src="js/vendor/lz-string.min.js"></script>
+<script src="js/format.js"></script>
+<script src="js/sums.js"></script>
+<script src="js/render.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>
