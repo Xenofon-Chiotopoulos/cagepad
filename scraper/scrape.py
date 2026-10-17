@@ -13,6 +13,7 @@ import html
 import json
 import os
 import re
+import ssl
 import sys
 import time
 import urllib.error
@@ -56,7 +57,12 @@ def fetch(url, retries=2):
             if e.code == 404:
                 raise
             err = e
-        except Exception as e:  # network / TLS errors: retry
+        except urllib.error.URLError as e:
+            # an invalid/expired certificate will not fix itself in a few seconds
+            if isinstance(getattr(e, "reason", None), ssl.SSLCertVerificationError):
+                raise
+            err = e
+        except Exception as e:  # other network errors: retry
             err = e
         time.sleep(2 * (attempt + 1))
     raise err
